@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+<title>TG AI – Dil bhi jeete, logic bhi.</title>
+
+<!-- Tailwind CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Marked -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+<!-- Highlight.js -->
+<link rel="stylesheet"
+ href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+<style>
+html, body { height:100%; }
+.sidebar-transition { transition: transform 0.3s ease; }
+</style>
+</head>
+
+<body class="bg-gray-50 text-gray-900 min-h-screen flex">
+
+<div id="loading" class="fixed inset-0 flex items-center justify-center bg-white z-50">
+  <div class="text-center">
+    <h1 class="text-3xl font-bold text-pink-500">TG AI</h1>
+    <p class="text-sm text-gray-400">Dil bhi jeete, logic bhi.</p>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<div id="sidebar"
+ class="sidebar-transition fixed md:relative z-40 bg-white/80 backdrop-blur w-72 border-r min-h-screen flex flex-col transform -translate-x-full md:translate-x-0">
+
+  <div class="p-4 border-b">
+    <h1 class="text-xl font-bold text-pink-500">TG AI</h1>
+    <p class="text-xs text-gray-400">Dil bhi jeete, logic bhi.</p>
+
+    <input id="chatSearch"
+      placeholder="Search chats..."
+      class="w-full mt-3 p-2 text-sm border rounded">
+
+    <button id="newChatBtn"
+      class="mt-3 w-full bg-pink-500 hover:bg-pink-600 text-white text-sm p-2 rounded">
+      + New Chat
+    </button>
+  </div>
+
+  <div id="chatList" class="flex-1 overflow-y-auto p-2 space-y-2"></div>
+
+  <div class="p-3 border-t space-y-2">
+    <button id="settingsBtn" class="w-full text-sm bg-gray-100 p-2 rounded">Settings</button>
+    <button id="darkToggle" class="w-full text-sm bg-gray-100 p-2 rounded">Toggle Dark</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="flex-1 flex flex-col min-h-screen">
+
+  <div class="p-3 border-b bg-white flex items-center gap-3">
+    <button id="menuBtn" class="md:hidden">☰</button>
+    <div>
+      <h2 class="text-lg font-bold text-pink-500">TG AI</h2>
+      <p class="text-xs text-gray-400">Dil bhi jeete, logic bhi.</p>
+    </div>
+  </div>
+
+  <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
+
+  <!-- INPUT AREA -->
+  <div class="sticky bottom-0 bg-white border-t p-3">
+    <div class="flex gap-2 items-center">
+
+      <input type="file" id="imageUpload" accept="image/*" hidden>
+
+      <button id="uploadBtn"
+        class="bg-gray-200 hover:bg-gray-300 px-3 rounded">🖼</button>
+
+      <button id="micBtn"
+        class="bg-gray-200 hover:bg-gray-300 px-3 rounded">🎤</button>
+
+      <textarea id="userInput"
+        rows="1"
+        placeholder="Ask TG AI..."
+        class="flex-1 resize-none border rounded p-2 focus:outline-none"></textarea>
+
+      <button id="sendBtn"
+        class="bg-pink-500 hover:bg-pink-600 text-white px-4 rounded">
+        Send
+      </button>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- SETTINGS MODAL -->
+<div id="settingsModal"
+ class="fixed inset-0 bg-black bg-opacity-40 hidden items-center justify-center z-50">
+  <div class="bg-white w-96 max-w-full p-6 rounded space-y-4">
+    <h3 class="font-semibold">Settings</h3>
+
+    <input id="apiKeyInput" type="password"
+      placeholder="OpenRouter API Key"
+      class="w-full border p-2 rounded">
+
+    <input id="modelInput" type="text"
+      value="deepseek/deepseek-r1:free"
+      class="w-full border p-2 rounded">
+
+    <div class="flex justify-end gap-2">
+      <button id="closeSettings"
+        class="px-3 py-1 bg-gray-200 rounded">Cancel</button>
+      <button id="saveSettings"
+        class="px-3 py-1 bg-pink-500 text-white rounded">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+
+let chats = JSON.parse(localStorage.getItem("chats") || "[]");
+let currentChatId = localStorage.getItem("currentChatId") || null;
+let apiKey = localStorage.getItem("apiKey") || "";
+let model = localStorage.getItem("model") || "deepseek/deepseek-r1:free";
+let darkMode = localStorage.getItem("darkMode")==="true";
+
+const sidebar = document.getElementById("sidebar");
+const messagesDiv = document.getElementById("messages");
+const userInput = document.getElementById("userInput");
+
+function save(){
+  localStorage.setItem("chats", JSON.stringify(chats));
+  localStorage.setItem("currentChatId", currentChatId);
+  localStorage.setItem("apiKey", apiKey);
+  localStorage.setItem("model", model);
+}
+
+function createNewChat(){
+  const id=Date.now().toString();
+  chats.push({id,title:"New Chat",messages:[]});
+  currentChatId=id;
+  save();
+}
+
+function getCurrentChat(){
+  return chats.find(c=>c.id===currentChatId);
+}
+
+function renderChatList(){
+  const chatList=document.getElementById("chatList");
+  chatList.innerHTML="";
+  chats.forEach(chat=>{
+    const div=document.createElement("div");
+    div.className="p-2 bg-gray-100 rounded cursor-pointer flex justify-between text-sm";
+    div.innerHTML=`<span>${chat.title}</span><button class="text-red-500">×</button>`;
+    div.onclick=()=>{
+      currentChatId=chat.id;
+      save();
+      renderMessages();
+      if(window.innerWidth<768) sidebar.classList.add("-translate-x-full");
+    };
+    div.querySelector("button").onclick=(e)=>{
+      e.stopPropagation();
+      chats=chats.filter(c=>c.id!==chat.id);
+      currentChatId=chats[0]?.id||null;
+      save();renderChatList();renderMessages();
+    };
+    chatList.appendChild(div);
+  });
+}
+
+function renderMessages(){
+  messagesDiv.innerHTML="";
+  const chat=getCurrentChat();
+  if(!chat) return;
+  chat.messages.forEach(m=>{
+    const wrap=document.createElement("div");
+    wrap.className=m.role==="user"?"text-right":"text-left";
+    const bubble=document.createElement("div");
+    bubble.className="inline-block max-w-xl p-3 rounded shadow";
+    bubble.className+=m.role==="user"
+      ?" bg-pink-500 text-white"
+      :" bg-gray-200";
+    bubble.innerHTML=marked.parse(m.content);
+    bubble.querySelectorAll("pre code").forEach(block=>{
+      hljs.highlightElement(block);
+    });
+    wrap.appendChild(bubble);
+    messagesDiv.appendChild(wrap);
+  });
+  messagesDiv.scrollTop=messagesDiv.scrollHeight;
+}
+
+async function sendMessage(){
+  const text=userInput.value.trim();
+  if(!text||!apiKey) return;
+
+  const chat=getCurrentChat();
+  chat.messages.push({role:"user",content:text});
+  userInput.value="";
+  renderMessages();
+  save();
+
+  const aiMsg={role:"assistant",content:"TG AI is thinking..."};
+  chat.messages.push(aiMsg);
+  renderMessages();
+
+  try{
+    const response=await fetch("https://openrouter.ai/api/v1/chat/completions",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization":"Bearer "+apiKey
+      },
+      body:JSON.stringify({
+        model:model,
+        stream:true,
+        messages:chat.messages
+      })
+    });
+
+    aiMsg.content="";
+    const reader=response.body.getReader();
+    const decoder=new TextDecoder();
+
+    while(true){
+      const {done,value}=await reader.read();
+      if(done) break;
+      const chunk=decoder.decode(value);
+      chunk.split("\n").forEach(line=>{
+        if(line.startsWith("data: ")){
+          const data=line.replace("data: ","").trim();
+          if(data==="[DONE]") return;
+          try{
+            const json=JSON.parse(data);
+            const token=json.choices?.[0]?.delta?.content;
+            if(token){
+              aiMsg.content+=token;
+              renderMessages();
+            }
+          }catch{}
+        }
+      });
+    }
+
+    speak(aiMsg.content);
+    save();
+
+  }catch{
+    aiMsg.content="Error fetching response.";
+    renderMessages();
+  }
+}
+
+// VOICE INPUT
+let recognition;
+if(window.SpeechRecognition||window.webkitSpeechRecognition){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  recognition=new SR();
+  recognition.lang="en-US";
+  recognition.onresult=e=>{
+    userInput.value+=e.results[0][0].transcript;
+  };
+}
+document.getElementById("micBtn").onclick=()=>{
+  if(recognition) recognition.start();
+};
+
+// VOICE OUTPUT
+function speak(text){
+  const speech=new SpeechSynthesisUtterance(text);
+  speech.rate=1;
+  speech.pitch=1;
+  window.speechSynthesis.speak(speech);
+}
+
+// IMAGE UPLOAD
+document.getElementById("uploadBtn").onclick=()=>{
+  document.getElementById("imageUpload").click();
+};
+document.getElementById("imageUpload").onchange=e=>{
+  const file=e.target.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(){
+    const chat=getCurrentChat();
+    chat.messages.push({
+      role:"user",
+      content:`<img src="${reader.result}" class="max-w-xs rounded shadow">`
+    });
+    save();renderMessages();
+  };
+  reader.readAsDataURL(file);
+};
+
+// SEARCH
+document.getElementById("chatSearch").addEventListener("input",e=>{
+  const term=e.target.value.toLowerCase();
+  document.querySelectorAll("#chatList > div").forEach(div=>{
+    div.style.display=
+      div.innerText.toLowerCase().includes(term)?"flex":"none";
+  });
+});
+
+document.getElementById("sendBtn").onclick=sendMessage;
+userInput.addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&!e.shiftKey){
+    e.preventDefault();sendMessage();
+  }
+});
+
+document.getElementById("menuBtn").onclick=()=>{
+  sidebar.classList.toggle("-translate-x-full");
+};
+
+document.getElementById("settingsBtn").onclick=()=>{
+  document.getElementById("settingsModal").classList.remove("hidden");
+};
+document.getElementById("closeSettings").onclick=()=>{
+  document.getElementById("settingsModal").classList.add("hidden");
+};
+document.getElementById("saveSettings").onclick=()=>{
+  apiKey=document.getElementById("apiKeyInput").value.trim();
+  model=document.getElementById("modelInput").value.trim();
+  save();
+  document.getElementById("settingsModal").classList.add("hidden");
+};
+
+document.getElementById("darkToggle").onclick=()=>{
+  document.body.classList.toggle("bg-gray-900");
+  document.body.classList.toggle("text-white");
+};
+
+if(!currentChatId) createNewChat();
+renderChatList();
+renderMessages();
+document.getElementById("loading").style.display="none";
+
+})();
+</script>
+
+</body>
+</html>
